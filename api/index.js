@@ -3,6 +3,7 @@ import { handle } from "hono/vercel";
 import postgres from "postgres";
 import dotenv from "dotenv";
 import slugify from "slugify";
+import { methodOverride } from "hono/method-override";
 
 dotenv.config();
 
@@ -20,20 +21,9 @@ const sql = postgres({
 });
 
 app.use("*", (c, next) => {
-  c.res.headers.set("Access-Control-Allow-Origin", "*");
-  c.res.headers.set(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PATCH, PUT, DELETE, OPTIONS"
-  );
-  c.res.headers.set(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
-  );
-
-  if (c.req.method === "OPTIONS") {
-    return c.res.sendStatus(204);
-  }
-
+  c.header("Access-Control-Allow-Origin", "*");
+  c.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  c.header("Access-Control-Allow-Headers", "Content-Type");
   return next();
 });
 
@@ -81,10 +71,59 @@ app.get("/posts/:postId", async (c) => {
   }
 });
 
+app.delete("/posts/:postId", async (c) => {
+  const { postId } = c.req.param();
+  console.log(postId);
+
+  try {
+    const result = await sql`
+      DELETE FROM "Post" WHERE "post_id" = ${postId} RETURNING *
+    `;
+    if (result.length === 0) {
+      return c.status(404).json({ error: "Post not found" });
+    }
+    return c.json({
+      message: "Post deleted successfully",
+      deletedPost: result[0],
+    });
+  } catch (error) {
+    console.error("Error deleting post:", error);
+    return c.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.patch("/posts/:postId", async (c) => {
+  const { postId } = c.req.param();
+  const { title, content, author } = await c.req.json();
+  const slug = slugify(title, { lower: true });
+
+  try {
+    const result = await sql`
+      UPDATE "Post" 
+      SET "title" = ${title}, "content" = ${content}, "author" = ${author}, "slug" = ${slug}, "update_at" = CURRENT_TIMESTAMP 
+      WHERE "post_id" = ${postId} 
+      RETURNING *
+    `;
+
+    if (result.length === 0) {
+      return c.status(404).json({ error: "Post not found" });
+    }
+
+    return c.json({
+      message: "Post updated successfully",
+      updatedPost: result[0],
+    });
+  } catch (error) {
+    console.error("Error updating post:", error);
+    return c.status(500).json({ error: "Internal server error" });
+  }
+});
+
 const handler = handle(app);
 
 export const GET = handler;
 export const POST = handler;
 export const PATCH = handler;
 export const PUT = handler;
+export const DELETE = handler;
 export const OPTIONS = handler;
