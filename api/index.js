@@ -31,14 +31,39 @@ app.get("/", (c) => {
   return c.json({ message: "Congrats! You've deployed Hono to Vercel" });
 });
 
+// app.get("/posts", async (c) => {
+//   try {
+//     const posts = await sql`SELECT * FROM "Post" ORDER BY "update_at" DESC`;
+//     return c.json(posts);
+//   } catch (error) {
+//     console.error("Error fetching posts:", error);
+//     return c.status(500).json({ error: "Internal server error" });
+//   }
+// });
+
 app.get("/posts", async (c) => {
-  try {
-    const posts = await sql`SELECT * FROM "Post" ORDER BY "update_at" DESC`;
-    return c.json(posts);
-  } catch (error) {
-    console.error("Error fetching posts:", error);
-    return c.status(500).json({ error: "Internal server error" });
-  }
+  const page = parseInt(c.req.query("page") || "1");
+  const limit = 10;
+  const offset = (page - 1) * limit;
+
+  const [{ count }] = await sql`SELECT COUNT(*) FROM "Post"`;
+  const totalRows = parseInt(count);
+  const totalPages = Math.ceil(totalRows / limit);
+
+  const posts = await sql`
+    SELECT * FROM "Post"
+    ORDER BY "update_at" DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+
+  return c.json({
+    firstPage: 1,
+    lastPage: totalPages,
+    nextPage: page < totalPages ? page + 1 : null,
+    prevPage: page > 1 ? page - 1 : null,
+    posts,
+    pages: totalPages,
+  });
 });
 
 app.post("/posts", async (c) => {
