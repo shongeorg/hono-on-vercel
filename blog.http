@@ -1,0 +1,147 @@
+### Hono Blog API - Test Requests
+### Usage: Run with VS Code REST Client extension or similar
+
+# ==================== AUTH ====================
+
+### Register new user
+POST http://localhost:3001/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "test@test.com",
+  "password": "password123",
+  "name": "Test User"
+}
+
+### Login (get JWT token)
+# @name login
+POST http://localhost:3001/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@test.com",
+  "password": "password123"
+}
+
+### Extract token from login response
+@token = {{login.response.body.token}}
+
+### Get current user profile
+GET http://localhost:3001/api/auth/me
+Authorization: Bearer {{token}}
+
+# ==================== PUBLIC POSTS ====================
+
+### Get all posts
+GET http://localhost:3001/api/posts
+
+### Get all posts (page 2)
+GET http://localhost:3001/api/posts?page=2
+
+### Get single post by ID
+GET http://localhost:3001/api/posts/48820de5-c4e0-4656-a8c0-7594288b67c6
+
+# ==================== PROTECTED POSTS ====================
+
+### Create new post
+POST http://localhost:3001/api/posts
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Новий пост",
+  "content": "Контент нового посту"
+}
+
+### Update post (PATCH)
+PATCH http://localhost:3001/api/posts/48820de5-c4e0-4656-a8c0-7594288b67c6
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Оновлений заголовок",
+  "content": "Оновлений контент посту"
+}
+
+### Delete post
+DELETE http://localhost:3001/api/posts/9ee2fee9-220e-45ec-bebb-5140c60b8145
+Authorization: Bearer {{token}}
+
+### Get author's own posts
+GET http://localhost:3001/api/my/posts
+Authorization: Bearer {{token}}
+
+# ==================== COMMENTS ====================
+
+### Get comments for a post
+GET http://localhost:3001/api/posts/48820de5-c4e0-4656-a8c0-7594288b67c6/comments
+
+### Create new comment
+POST http://localhost:3001/api/posts/48820de5-c4e0-4656-a8c0-7594288b67c6/comments
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "content": "Новий коментар до посту"
+}
+
+### Update comment (PATCH)
+PATCH http://localhost:3001/api/posts/48820de5-c4e0-4656-a8c0-7594288b67c6/comments/16ef6d76-f1ec-4ee9-9106-dbf614846c3d
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "content": "Оновлений текст коментаря"
+}
+
+### Delete comment
+DELETE http://localhost:3001/api/posts/48820de5-c4e0-4656-a8c0-7594288b67c6/comments/ae4236d1-9938-402c-8478-40bd8cf74159
+Authorization: Bearer {{token}}
+
+### Get author's own comments
+GET http://localhost:3001/api/my/comments
+Authorization: Bearer {{token}}
+
+# ==================== ERROR CASES ====================
+
+### Try to create post without auth (should fail 401)
+POST http://localhost:3001/api/posts
+Content-Type: application/json
+
+{
+  "title": "No auth post",
+  "content": "This should fail"
+}
+
+### Try to update someone else's post (should fail 404)
+PATCH http://localhost:3001/api/posts/some-other-uuid
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Hacked title",
+  "content": "This should fail"
+}
+
+### Invalid token (should fail 401)
+GET http://localhost:3001/api/my/posts
+Authorization: Bearer invalid-token-here
+
+### Validation error - empty title (should fail 400)
+POST http://localhost:3001/api/posts
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "",
+  "content": "Some content"
+}
+
+### Validation error - missing fields (should fail 400)
+POST http://localhost:3001/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "invalid-email",
+  "password": "123"
+}
