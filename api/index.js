@@ -3,7 +3,6 @@ import { handle } from "hono/vercel";
 import postgres from "postgres";
 import dotenv from "dotenv";
 import slugify from "slugify";
-import { methodOverride } from "hono/method-override";
 
 dotenv.config();
 
@@ -30,16 +29,6 @@ app.use("*", (c, next) => {
 app.get("/", (c) => {
   return c.json({ message: "Congrats! You've deployed Hono to Vercel" });
 });
-
-// app.get("/posts", async (c) => {
-//   try {
-//     const posts = await sql`SELECT * FROM "Post" ORDER BY "update_at" DESC`;
-//     return c.json(posts);
-//   } catch (error) {
-//     console.error("Error fetching posts:", error);
-//     return c.status(500).json({ error: "Internal server error" });
-//   }
-// });
 
 app.get("/posts", async (c) => {
   const page = parseInt(c.req.query("page") || "1");
@@ -98,8 +87,6 @@ app.get("/posts/:postId", async (c) => {
 
 app.delete("/posts/:postId", async (c) => {
   const { postId } = c.req.param();
-  console.log(postId);
-
   try {
     const result = await sql`
       DELETE FROM "Post" WHERE "post_id" = ${postId} RETURNING *
@@ -140,6 +127,70 @@ app.patch("/posts/:postId", async (c) => {
     });
   } catch (error) {
     console.error("Error updating post:", error);
+    return c.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.get("/posts/:postId/comments", async (c) => {
+  const { postId } = c.req.param();
+  try {
+    const comments =
+      await sql`SELECT * FROM "Comment" WHERE "post_id" = ${postId} ORDER BY "create_at" ASC`;
+    return c.json(comments);
+  } catch (error) {
+    console.error("Error fetching comments:", error);
+    return c.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.post("/posts/:postId/comments", async (c) => {
+  const { postId } = c.req.param();
+  const { content, author } = await c.req.json();
+  try {
+    const newComment = await sql`
+      INSERT INTO "Comment" ("comment_id", "post_id", "content", "author", "create_at")
+      VALUES (gen_random_uuid(), ${postId}, ${content}, ${author}, CURRENT_TIMESTAMP)
+      RETURNING *
+    `;
+    return c.json(newComment[0]);
+  } catch (error) {
+    console.error("Error creating comment:", error);
+    return c.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.patch("/posts/:postId/comments/:commentId", async (c) => {
+  const { commentId } = c.req.param();
+  const { content, author } = await c.req.json();
+  try {
+    const result = await sql`
+      UPDATE "Comment"
+      SET "content" = ${content}, "author" = ${author}, "update_at" = CURRENT_TIMESTAMP
+      WHERE "comment_id" = ${commentId}
+      RETURNING *
+    `;
+    if (result.length === 0) {
+      return c.status(404).json({ error: "Comment not found" });
+    }
+    return c.json(result[0]);
+  } catch (error) {
+    console.error("Error updating comment:", error);
+    return c.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.delete("/posts/:postId/comments/:commentId", async (c) => {
+  const { commentId } = c.req.param();
+  try {
+    const result = await sql`
+      DELETE FROM "Comment" WHERE "comment_id" = ${commentId} RETURNING *
+    `;
+    if (result.length === 0) {
+      return c.status(404).json({ error: "Comment not found" });
+    }
+    return c.json({ message: "Comment deleted" });
+  } catch (error) {
+    console.error("Error deleting comment:", error);
     return c.status(500).json({ error: "Internal server error" });
   }
 });
